@@ -3,7 +3,7 @@ import MovieSkeleton from './components/MovieSkeleton'
 import './App.css'
 import 'react-loading-skeleton/dist/skeleton.css'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faSearch } from '@fortawesome/free-solid-svg-icons'
+import { faSearch, faTimes } from '@fortawesome/free-solid-svg-icons'
 
 function App() {
   const [movies, setMovies] = useState([])
@@ -11,6 +11,8 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [isSearching, setIsSearching] = useState(false)
+  const [selectedMovie, setSelectedMovie] = useState(null)
+  const [loadingDetails, setLoadingDetails] = useState(false)
 
   const handleSearch = async (e) => {
     e.preventDefault()
@@ -48,6 +50,21 @@ function App() {
     fetchMovies()
   }, [])
 
+  const fetchMovieDetails = async (movieId) => {
+    setLoadingDetails(true)
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/movie/${movieId}?api_key=${import.meta.env.VITE_API_KEY}&language=es-ES`
+      )
+      const data = await response.json()
+      setSelectedMovie(data)
+    } catch (error) {
+      console.error('Error al obtener detalles:', error)
+    } finally {
+      setLoadingDetails(false)
+    }
+  }
+
   // Renderizar skeletons
   const renderSkeletons = () => {
     return Array(8).fill(0).map((_, index) => (
@@ -81,7 +98,11 @@ function App() {
         ) : searchResults.length > 0 || !searchTerm ? (
           // Si hay resultados de búsqueda o no hay término de búsqueda, mostrar películas
           (searchResults.length > 0 ? searchResults : movies).map((movie) => (
-            <div key={movie.id} className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div 
+              key={movie.id} 
+              className="bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer transform hover:scale-105 transition-transform"
+              onClick={() => fetchMovieDetails(movie.id)}
+            >
               <img 
                 src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
                 alt={movie.title}
@@ -106,6 +127,45 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* Modal de detalles */}
+      {selectedMovie && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
+            <button 
+              onClick={() => setSelectedMovie(null)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+            >
+              <FontAwesomeIcon icon={faTimes} size="lg" />
+            </button>
+            {loadingDetails ? (
+              <div className="p-8">
+                <MovieSkeleton />
+              </div>
+            ) : (
+              <div className="p-6">
+                <div className="flex flex-col md:flex-row gap-6">
+                  <img 
+                    src={`https://image.tmdb.org/t/p/w500${selectedMovie.poster_path}`}
+                    alt={selectedMovie.title}
+                    className="w-full md:w-1/3 rounded-lg"
+                  />
+                  <div className="flex-1">
+                    <h2 className="text-3xl font-bold mb-4">{selectedMovie.title}</h2>
+                    <p className="text-gray-600 mb-4">{selectedMovie.release_date}</p>
+                    <p className="text-lg mb-4">{selectedMovie.overview}</p>
+                    <div className="space-y-2">
+                      <p><span className="font-semibold">Puntuación:</span> {selectedMovie.vote_average}/10</p>
+                      <p><span className="font-semibold">Duración:</span> {selectedMovie.runtime} minutos</p>
+                      <p><span className="font-semibold">Géneros:</span> {selectedMovie.genres?.map(g => g.name).join(', ')}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
